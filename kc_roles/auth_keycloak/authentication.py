@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Tuple
+from django.conf import settings
 from urllib.parse import splitvalue
 from django.conf import settings
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
@@ -51,6 +51,7 @@ class JWTAuthentication(BaseAuthentication):
         algorithms=['RS256'],
         audience=settings.KEYCLOAK_CLIENT_ID,
         issuer=settings.KEYCLOAK_REALM_URL,
+        options={"verify_exp": True}
       )
 
     except jwt.ExpiredSignatureError as e:
@@ -75,12 +76,45 @@ class JWTAuthentication(BaseAuthentication):
     email = payload.get("email", "")
     name = payload.get("name", "")
 
-    django_user = self.get_or_create_user(keycloak_id, username, email, name, payload)
+    # Extract roles from keycloak token
+    user_type = self.extract_user_type(payload)
+
+    django_user = self.get_or_create_user(keycloak_id, username, email, name,user_type, payload)
 
     logger.info(f"✅ Authentication successful for user: {django_user.username} (ID: {django_user.id})")
     return (django_user, payload)
 
-  def get_or_create_user(self, keycloak_id:str, username:str, email:str, name:str, payload:dict):
+  def extract_user_type(self, payload: dict) -> str:
+    """
+      Extract user type from keycloak roles.
+      Check both realm_access and resource_access roles.
+      Maps: 'student' , 'parent' , 'admin' roles to user_type.
+    """
+
+    #   Check realm roles
+    realm_roles = payload.get("realm_access", {}).get("roles", [])
+
+    # Check client roles
+    resource_access = payload.get('resource_access', {})
+    client_roles = []
+    for client, access in resource_access.items():
+      client_roles.extend(access.get('roles', []))
+
+    all_roles = realm_roles + client_roles
+
+  #   Priority roles : admin > parent > student
+    if 'admin' in all_roles:
+      return 'admin'
+    elif 'teacher' in all_roles or 'parent' in all_roles:
+      return 'teacher'
+    elif 'student' in all_roles:
+      return 'student'
+
+    #   Default to student if no recognised role
+    logger.warning(f"No recognised role found in keycloak token. Defaulting to 'student' role.")
+    return 'student'
+
+  def get_or_create_user(self, keycloak_id:str, username:str, email:str, name:str,user_type:str,  payload:dict):
     """ Get or create Django user from keycloak user"""
     try:
 #     try to find the user by keycloak ID first
@@ -113,6 +147,7 @@ class JWTAuthentication(BaseAuthentication):
         email = email,
         name = name,
         keycloak_id = keycloak_id,
+        user_type = user_type,
         is_active = True
       )
       logger.info(f"Created new Django user: {user.username} from keycloak user")
@@ -123,11 +158,12 @@ class JWTAuthentication(BaseAuthentication):
 #     if username is already exists with different case or special characters.
       import uuid
       unique_username = f"{username}_{uuid.uuid4().hex[:8]}"
-      user = User.object.create(
+      user = User.objects.create(
         username = unique_username,
         email = email,
         name = name,
         keycloak_id = keycloak_id,
+        user_type=user_type,
         is_active = True
       )
       logger.info(f"Created new Django user: {user.username} from keycloak user")

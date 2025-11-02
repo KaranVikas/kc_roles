@@ -40,12 +40,43 @@ INSTALLED_APPS = [
     "rest_framework",
     "todo",
     "accounts",
-    "drf_spectacular"
+    "drf_spectacular",
+    "corsheaders"
 ]
 
+# Keycloak Configuration
+KEYCLOAK_SERVER_URL = "http://localhost:8080"
+KEYCLOAK_REALM = "todo"
+KEYCLOAK_CLIENT_ID = "admin-cli"
+KEYCLOAK_REALM_URL = f"{KEYCLOAK_SERVER_URL}/realms/{KEYCLOAK_REALM}"
+KEYCLOAK_REALM_JWKS_URL = f"{KEYCLOAK_REALM_URL}/protocol/openid-connect/certs"
+
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASS': [
+      'auth_keycloak.authentication.JWTAuthentication',
+      'rest_framework.authentication.SessionAuthentication',
+      'drf_spectacular.openapi.AutoSchema',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+      'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema'
 }
+# DRF Spectacular Settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Todo API with Keycloak',
+    'DESCRIPTION': 'API for managing todos with role-based access control',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+
+# CORS Settings for frontend
+CORS_ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -130,3 +161,5 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
