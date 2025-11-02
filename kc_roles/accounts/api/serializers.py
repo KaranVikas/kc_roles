@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, StudentProfile, ParentProfile
+from ..models import User, StudentProfile, ParentProfile
 
 class UserSerializer(serializers.ModelSerializer):
   class Meta:
@@ -8,13 +8,14 @@ class UserSerializer(serializers.ModelSerializer):
     read_only_fields = ['id']
 
 class StudentProfileSerializer(serializers.ModelSerializer):
+  parent_name = serializers.CharField(source='parent.username', read_only=True)
   class Meta:
     model = StudentProfile
-    fields = ['id','user','grade','parent','parent_name']
+    fields = ['user','grade','parent','parent_name']
 
 class ParentProfileSerializer(serializers.ModelSerializer):
   user = UserSerializer()
-  children = serializers.StringRelatedField()
+  children = serializers.SerializerMethodField()
 
   class Meta:
     model = ParentProfile
@@ -27,9 +28,9 @@ class ParentProfileSerializer(serializers.ModelSerializer):
 class RegisterSerializer(serializers.ModelSerializer):
 
   password = serializers.CharField(write_only=True)
-  parent_id = serializers.IntegerField(write_only=True)
-  grade = serializers.CharField(write_only=True)
-  occupation = serializers.CharField(write_only=True)
+  parent_id = serializers.IntegerField(write_only=True, required=False)
+  grade = serializers.CharField(write_only=True,  required=False)
+  occupation = serializers.CharField(write_only=True,  required=False)
 
   class Meta:
     model = User
@@ -39,8 +40,11 @@ class RegisterSerializer(serializers.ModelSerializer):
     parent_id = validated_data.pop('parent_id', None)
     grade = validated_data.pop('grade', None)
     occupation = validated_data.pop('occupation', None)
+    password = validated_data.pop('password')
 
     user = User.objects.create(**validated_data)
+    user .set_password(password)
+    user.save()
 
     # Create profile based on user type
     if user.user_type == 'student':
