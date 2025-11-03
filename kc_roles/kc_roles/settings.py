@@ -47,7 +47,7 @@ INSTALLED_APPS = [
 # Keycloak Configuration
 KEYCLOAK_SERVER_URL = "http://localhost:8080"
 KEYCLOAK_REALM = "todo"
-KEYCLOAK_CLIENT_ID = "admin-cli"
+KEYCLOAK_CLIENT_ID = "todo"
 KEYCLOAK_REALM_URL = f"{KEYCLOAK_SERVER_URL}/realms/{KEYCLOAK_REALM}"
 KEYCLOAK_REALM_JWKS_URL = f"{KEYCLOAK_REALM_URL}/protocol/openid-connect/certs"
 
